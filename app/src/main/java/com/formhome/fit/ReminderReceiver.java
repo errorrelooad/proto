@@ -17,7 +17,7 @@ public class ReminderReceiver extends BroadcastReceiver {
 
     @Override public void onReceive(Context context, Intent intent) {
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-            var prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            android.content.SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             if (prefs.getBoolean("enabled", false)) schedule(context, prefs.getInt("hour", 19), prefs.getInt("minute", 0));
             return;
         }
@@ -31,7 +31,7 @@ public class ReminderReceiver extends BroadcastReceiver {
             .setContentTitle("오늘의 홈트 시간이에요")
             .setContentText("가벼운 스트레칭부터 시작해 볼까요?")
             .setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).build());
-        var prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        android.content.SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         if (prefs.getBoolean("enabled", false)) schedule(context, prefs.getInt("hour", 19), prefs.getInt("minute", 0));
     }
 
