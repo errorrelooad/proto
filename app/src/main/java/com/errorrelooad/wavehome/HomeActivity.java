@@ -1137,8 +1137,7 @@ public class HomeActivity extends Activity {
     }
 
     private int getBrightness() {
-        try { return Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, 128); }
-        catch (Settings.SettingNotFoundException e) { return 128; }
+        return Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, 128);
     }
 
     private String appLabel(String packageName) {
