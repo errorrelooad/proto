@@ -1,0 +1,21 @@
+<resources>
+    <style name="WaveTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#A7F3D0</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:statusBarColor">#22080D16</item>
+        <item name="android:navigationBarColor">#33080D16</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="WaveStudioTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#A7F3D0</item>
+        <item name="android:windowBackground">#0B1017</item>
+        <item name="android:statusBarColor">#0B1017</item>
+        <item name="android:navigationBarColor">#0B1017</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

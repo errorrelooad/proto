@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Wave Home</string>
+    <string name="wallpaper_name">Wave Motion</string>
+    <string name="wallpaper_description">Wave Home에서 선택한 사진, GIF 또는 영상을 표시합니다.</string>
+</resources>
