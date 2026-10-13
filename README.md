@@ -1,45 +1,25 @@
 # Wave Home
 
-Wave Home is an Android launcher prototype with a custom home screen, an in-app notification center, user-defined app groups, and its own live wallpaper studio. It does not connect to or require Wallpaper Engine.
+Wave Home is an Android home-screen launcher. Choose it as the device's default Home app to use its app list whenever you press Home. It does not connect to Wallpaper Engine.
 
 ## Features
 
-- HOME launcher with installed-app discovery, search, Korean/English alphabet filters, and favorites
-- Custom app groups: create, rename, and delete categories; assign each app to multiple groups
-- Wallpaper Studio for images, GIFs, and videos selected from the phone
-- Live wallpaper controls for dimming photos/GIFs and adding parallax to photos; videos play muted and loop
-- Full in-app notification center with Frost, Midnight, and Warm Light themes
-- View, open, dismiss, or clear notifications after the user grants notification access
-- Quick settings tiles that open Android's supported Internet, Wi-Fi, volume, and display panels
-- Optional system brightness slider after the user grants Modify system settings access
-- GitHub Actions build for an installable debug APK
+- Search installed apps and launch them directly from the home screen
+- Make, rename, and delete your own app categories
+- Add several apps to a category at once, and place one app in multiple categories
+- Keep favorite and recently opened apps near the top
+- Assign categories or toggle favorites directly from an app row; long-press for more actions
+- Set a photo, GIF, or video from your phone as the live wallpaper; adjust photo/GIF dimming and photo parallax
 
-## Set up on Android
+## First use
 
-1. Download and install the `app-debug.apk` from a successful GitHub Actions run.
-2. Set Wave Home as the device's default Home app.
-3. Open **Settings → Wallpaper Studio**, select an image, GIF, or video, adjust the options, and tap **Apply wallpaper**. Confirm Wave Motion in Android's wallpaper preview.
-4. Open the app's **Settings → Notification access** action to grant access if you want to see notifications in Wave Home.
-5. On the home screen, use **＋ 만들기** to make categories. Tap the group icon on an app row to assign it to one or more categories. Long-press a category chip to rename or delete it.
+1. Install the debug APK and open Wave Home. On first launch, select it in Android's system prompt to make it the default Home app. If you dismiss the prompt, tap **기본 홈으로 설정**.
+2. Tap **배경** to open Wallpaper Studio, choose media, and tap **배경화면 적용**. Confirm Wave Motion in Android's wallpaper preview.
+3. Tap **＋** beside the category chips to create a category. Use **관리** to rename or delete categories, and **＋ 앱 추가** to assign multiple apps at once. The **⊞** control on an app row assigns that app to any number of categories.
+4. Tap an app to launch it. Tap **☆** to favorite it.
 
-Wallpaper media and category assignments stay on the device. Wallpaper dimming applies to photos and GIFs; parallax applies to photos. Videos use their source brightness and play without audio. GIF playback depends on the phone's file provider returning a decodable GIF stream.
+Wave Home leaves Android's notification shade and system settings to Android. Wallpaper files, favorites, recent apps, and categories are stored on the phone.
 
-## Notification center scope
+## Build
 
-The Frost, Midnight, and Warm Light themes apply to Wave Home's own notification center, opened by swiping down from the top of the launcher or tapping **제어**. Android does not let an ordinary third-party launcher restyle or replace the system-wide notification shade; that requires privileged system software or a custom Android build. Wave Home uses Android's supported Settings Panels for system controls.
-
-Notification access and Modify system settings are optional. Android asks the user to grant each permission in its own settings screen; Wave Home cannot grant either permission silently.
-
-## Build with GitHub Actions
-
-The **Build Wave Home APK** workflow runs on pushes to `wave-home` and can be started manually from the Actions tab. Download the `wave-home-debug-apk` artifact from a successful run. The debug APK is for sideload testing and is not a Play Store release.
-
-## Local build
-
-Requirements: JDK 17, Gradle 8.13, Android SDK Platform 36, and Build Tools 36.0.0.
-
-```sh
-gradle --no-daemon assembleDebug
-```
-
-The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+The **Build Wave Home APK** GitHub Actions workflow builds a debug APK when changes are pushed to the `wave-home` branch. The output is intended for sideload testing, not a Play Store release.

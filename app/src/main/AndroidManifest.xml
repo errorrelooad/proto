@@ -1,5 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
 
     <queries>
@@ -17,7 +16,7 @@
         android:theme="@style/WaveTheme">
         <activity
             android:name=".HomeActivity"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+            android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="unspecified">
@@ -36,16 +35,6 @@
             android:name=".WallpaperStudioActivity"
             android:exported="false"
             android:theme="@style/WaveStudioTheme" />
-
-        <service
-            android:name=".NotificationAccessService"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
 
         <service
             android:name=".HomeWallpaperService"
