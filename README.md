@@ -15,7 +15,7 @@ Wave Home is a standalone Android home launcher with an original interface and i
 - Android app-widget host with an ordered, removable widget stack
 - Optional calendar agenda access and a weather tile for a city entered by the user
 - Optional usage-time reminder, daily per app; requires Android Usage Access
-- Optional double-tap clock screen lock; requires enabling Wave Home as a device administrator
+- Optional double-tap clock or alphabet-index screen lock; requires enabling Wave Home as a device administrator
 - Music-app suggestion while a wired headset is connected
 - Photo, GIF or video live wallpapers from the phone, with photo/GIF dimming and photo parallax
 

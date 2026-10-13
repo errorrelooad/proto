@@ -122,6 +122,7 @@ public class HomeActivity extends Activity {
     private boolean widgetListening;
     private boolean weatherRefreshing;
     private long lastClockTap;
+    private long lastAlphabetTap;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private AppWidgetHost widgetHost;
     private AlertDialog widgetDialog;
@@ -801,6 +802,13 @@ public class HomeActivity extends Activity {
             letter.setGravity(Gravity.CENTER);
             alphabetRail.addView(letter, new LinearLayout.LayoutParams(MATCH, 0, 1f));
             letter.setOnClickListener(v -> {
+                long now = System.currentTimeMillis();
+                if (prefs.getBoolean("double_tap_lock", false) && now - lastAlphabetTap < 420) {
+                    lastAlphabetTap = 0;
+                    lockScreen();
+                    return;
+                }
+                lastAlphabetTap = now;
                 Integer index = sectionY.get(section);
                 if (index == null || index >= contentArea.getChildCount()) return;
                 contentArea.post(() -> listScroll.smoothScrollTo(0, contentArea.getChildAt(index).getTop()));
