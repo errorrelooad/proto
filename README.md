@@ -5,6 +5,7 @@ Wave Home is a standalone Android home launcher with an original interface and i
 ## Launcher features
 
 - Single-column app list, live clock, app search and a touchable alphabet index
+- Search apps, Android app shortcuts, the web and (when tapped) contacts
 - Favorites, recent apps and user-created app groups; an app can belong to several groups
 - Long-press an app for its Android shortcuts, favorites, group assignment, icon override and app info
 - Open a group as a compact pop-up, and assign an app or group to the bottom action button; swipe up to use its second action

@@ -40,6 +40,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
 import android.provider.CalendarContract;
+import android.provider.ContactsContract;
 import android.provider.Settings;
 import android.Manifest;
 import android.text.Editable;
@@ -107,6 +108,7 @@ public class HomeActivity extends Activity {
     private static final int WIDGET_HOST_ID = 73021;
     private static final int REQUEST_LOCK_ADMIN = 58;
     private static final int REQUEST_USAGE_ACCESS = 59;
+    private static final int REQUEST_CONTACTS = 60;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SharedPreferences prefs;
@@ -698,7 +700,7 @@ public class HomeActivity extends Activity {
                 contentArea.addView(addApps, params(MATCH, dp(46)));
                 addApps.setOnClickListener(v -> bulkAssignToGroup(selectedGroup));
             }
-            if (!query.isEmpty()) addWebSearchRow();
+            if (!query.isEmpty()) { addContactSearchRow(); addWebSearchRow(); }
             return;
         }
 
@@ -718,7 +720,59 @@ public class HomeActivity extends Activity {
             }
             contentArea.addView(appRow(app), params(MATCH, WRAP));
         }
-        if (!query.isEmpty()) addWebSearchRow();
+        if (!query.isEmpty()) { addContactSearchRow(); addWebSearchRow(); }
+    }
+
+    private void addContactSearchRow() {
+        TextView contacts = label("⌕  연락처에서 ‘" + currentQuery.trim() + "’ 찾기  ›", 13, SECONDARY);
+        contacts.setPadding(dp(8), 0, dp(8), 0);
+        contacts.setBackground(roundBg(0x44171B18, dp(14), HAIRLINE));
+        LinearLayout.LayoutParams lp = params(MATCH, dp(42));
+        lp.topMargin = dp(8);
+        contentArea.addView(contacts, lp);
+        contacts.setOnClickListener(v -> showContactSearchDialog());
+    }
+
+    private void showContactSearchDialog() {
+        if (checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            new AlertDialog.Builder(this).setTitle("연락처 검색")
+                    .setMessage("입력한 검색어와 일치하는 연락처 이름과 전화번호만 찾습니다.")
+                    .setNegativeButton("취소", null)
+                    .setPositiveButton("계속", (d, w) -> requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, REQUEST_CONTACTS))
+                    .show();
+            return;
+        }
+        String query = currentQuery.trim();
+        if (query.isEmpty()) return;
+        String[] projection = {ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                ContactsContract.CommonDataKinds.Phone.NUMBER};
+        String selection = ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " LIKE ? OR "
+                + ContactsContract.CommonDataKinds.Phone.NUMBER + " LIKE ?";
+        String match = "%" + query + "%";
+        ArrayList<String> rows = new ArrayList<>();
+        ArrayList<String> numbers = new ArrayList<>();
+        try (Cursor cursor = getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                projection, selection, new String[]{match, match},
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " COLLATE LOCALIZED ASC")) {
+            if (cursor != null) {
+                while (cursor.moveToNext() && rows.size() < 20) {
+                    String name = cursor.getString(0);
+                    String number = cursor.getString(1);
+                    rows.add((name == null ? "연락처" : name) + "\n" + (number == null ? "" : number));
+                    numbers.add(number == null ? "" : number);
+                }
+            }
+        } catch (SecurityException | IllegalArgumentException e) {
+            Toast.makeText(this, "연락처를 읽을 수 없습니다.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (rows.isEmpty()) rows.add("일치하는 연락처가 없습니다.");
+        new AlertDialog.Builder(this).setTitle("연락처 검색 결과")
+                .setItems(rows.toArray(new String[0]), (d, which) -> {
+                    if (which >= numbers.size() || numbers.get(which).isEmpty()) return;
+                    try { startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(numbers.get(which))))); }
+                    catch (ActivityNotFoundException ignored) { }
+                }).setPositiveButton("닫기", null).show();
     }
 
     private void addWebSearchRow() {
@@ -1618,6 +1672,7 @@ public class HomeActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_CALENDAR && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) showAgenda();
+        else if (requestCode == REQUEST_CONTACTS && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) showContactSearchDialog();
     }
 
     private void toggleFavorite(String packageName) {
