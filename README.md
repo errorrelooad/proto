@@ -1,24 +1,36 @@
 # Wave Home
 
-Wave Home is an Android home-screen launcher. Choose it as the device's default Home app to use its app list whenever you press Home. It does not connect to Wallpaper Engine.
+Wave Home is a standalone Android home launcher with an original interface and its own wallpaper studio. It does not connect to Wallpaper Engine.
 
-## Features
+## Launcher features
 
-- Search installed apps and launch them directly from the home screen
-- Make, rename, and delete your own app categories
-- Add several apps to a category at once, and place one app in multiple categories
-- Keep favorite and recently opened apps near the top
-- Assign categories or toggle favorites directly from an app row; long-press for more actions
-- Set a photo, GIF, or video from your phone as the live wallpaper; adjust photo/GIF dimming and photo parallax
+- Single-column app list, live clock, app search and a touchable alphabet index
+- Favorites, recent apps and user-created app groups; an app can belong to several groups
+- Long-press an app for its Android shortcuts, favorites, group assignment, icon override and app info
+- Open a group as a compact pop-up, and assign an app or group to the bottom action button; swipe up to use its second action
+- Five built-in palettes; import or export a palette file for sharing
+- System-font choices, 12/24-hour clock, clock size, dot icons and optional status-bar hiding
+- Local per-app icon overrides, stored on the device
+- Android app-widget host with an ordered, removable widget stack
+- Optional calendar agenda access and a weather tile for a city entered by the user
+- Optional usage-time reminder, daily per app; requires Android Usage Access
+- Optional double-tap clock screen lock; requires enabling Wave Home as a device administrator
+- Music-app suggestion while a wired headset is connected
+- Photo, GIF or video live wallpapers from the phone, with photo/GIF dimming and photo parallax
+
+Wave Home leaves Android's notification shade and Quick Settings panel under Android control. Calendar, Usage Access and Device Admin permissions are requested only when the related feature is enabled. Weather looks up the city selected by the user and does not request location permission.
 
 ## First use
 
-1. Install the debug APK and open Wave Home. On first launch, select it in Android's system prompt to make it the default Home app. If you dismiss the prompt, tap **기본 홈으로 설정**.
-2. Tap **배경** to open Wallpaper Studio, choose media, and tap **배경화면 적용**. Confirm Wave Motion in Android's wallpaper preview.
-3. Tap **＋** beside the category chips to create a category. Use **관리** to rename or delete categories, and **＋ 앱 추가** to assign multiple apps at once. The **⊞** control on an app row assigns that app to any number of categories.
-4. Tap an app to launch it. Tap **☆** to favorite it.
+1. Install and open the APK, then select Wave Home as the default Home app when Android asks.
+2. Tap an app to open it. Long-press an app to see shortcuts and organization actions.
+3. Use **앱 모음** to create custom groups and assign apps. The right-edge index jumps through the app list.
+4. Use **위젯** to add Android widgets to a stack. Use **배경** to open Wallpaper Studio and apply a selected photo, GIF or video as the live wallpaper.
+5. Open **···** for theme, type, calendar and usage features.
 
-Wave Home leaves Android's notification shade and system settings to Android. Wallpaper files, favorites, recent apps, and categories are stored on the phone.
+## Build
+
+The **Build Wave Home APK** GitHub Actions workflow builds a debug APK on pushes to `wave-home`. The artifact is for direct Android installation and testing, not a Play Store release.
 
 ## Build
 
