@@ -127,7 +127,7 @@ public class HomeActivity extends Activity {
     private AppWidgetHost widgetHost;
     private AlertDialog widgetDialog;
     private ScrollView listScroll;
-    private LinearLayout alphabetRail;
+    private AlphabetIndexView alphabetRail;
     private TextView weatherView;
     private TextView agendaView;
     private final HashMap<String, Integer> sectionY = new HashMap<>();
@@ -146,6 +146,7 @@ public class HomeActivity extends Activity {
     private EditText searchField;
     private TextView clearSearch;
     private LinearLayout categoryRow;
+    private LinearLayout searchContainer;
     private LinearLayout contentArea;
     private LinearLayout homeRoot;
     private View defaultHomeCard;
@@ -183,6 +184,141 @@ public class HomeActivity extends Activity {
         AppGroup(String id, String name) {
             this.id = id;
             this.name = name;
+        }
+    }
+
+
+    private final class AlphabetIndexView extends View {
+        private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint activePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private List<String> sections = new ArrayList<>();
+        private int activeIndex = -1;
+        private float downY;
+        private boolean moved;
+
+        AlphabetIndexView() {
+            super(HomeActivity.this);
+            setClickable(true);
+            setFocusable(true);
+            setContentDescription("앱 알파벳 탐색");
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            activePaint.setColor(Color.argb(35, Color.red(ACCENT), Color.green(ACCENT), Color.blue(ACCENT)));
+        }
+
+        void setSections(List<String> values) {
+            sections = new ArrayList<>(values);
+            if (activeIndex >= sections.size()) activeIndex = -1;
+            setVisibility(sections.isEmpty() ? View.GONE : View.VISIBLE);
+            invalidate();
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            int count = sections.size();
+            if (count == 0) return;
+            float top = getPaddingTop();
+            float usable = Math.max(1, getHeight() - top - getPaddingBottom());
+            float cell = usable / count;
+            float size = Math.min(dp(11), cell * 0.62f);
+            textPaint.setTextSize(size);
+            for (int i = 0; i < count; i++) {
+                float centerY = top + cell * (i + 0.5f);
+                if (i == activeIndex) {
+                    float radius = Math.min(dp(13), cell * 0.43f);
+                    canvas.drawRoundRect(getWidth() / 2f - radius, centerY - radius,
+                            getWidth() / 2f + radius, centerY + radius,
+                            radius, radius, activePaint);
+                    textPaint.setColor(ACCENT);
+                } else {
+                    textPaint.setColor(SECONDARY);
+                }
+                Paint.FontMetrics fm = textPaint.getFontMetrics();
+                float baseline = centerY - (fm.ascent + fm.descent) / 2f;
+                canvas.drawText(sections.get(i), getWidth() / 2f, baseline, textPaint);
+            }
+        }
+
+        private int indexAt(float y) {
+            if (sections.isEmpty()) return -1;
+            float usable = Math.max(1, getHeight() - getPaddingTop() - getPaddingBottom());
+            float relative = Math.max(0, Math.min(0.999f,
+                    (y - getPaddingTop()) / usable));
+            return Math.min(sections.size() - 1, (int) (relative * sections.size()));
+        }
+
+        private void selectAt(float y) {
+            int index = indexAt(y);
+            if (index < 0) return;
+            activeIndex = index;
+            String section = sections.get(index);
+            Integer childIndex = sectionY.get(section);
+            if (childIndex != null && childIndex < contentArea.getChildCount()) {
+                contentArea.post(() -> {
+                    if (listScroll != null && contentArea != null
+                            && childIndex < contentArea.getChildCount()) {
+                        if (moved) listScroll.scrollTo(0, contentArea.getChildAt(childIndex).getTop());
+                        else listScroll.smoothScrollTo(0, contentArea.getChildAt(childIndex).getTop());
+                    }
+                });
+            }
+            invalidate();
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event) {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downY = event.getY();
+                    moved = false;
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                    selectAt(event.getY());
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    if (Math.abs(event.getY() - downY) > dp(5)) moved = true;
+                    selectAt(event.getY());
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    if (!moved && prefs.getBoolean("double_tap_lock", false)) {
+                        long now = System.currentTimeMillis();
+                        if (now - lastAlphabetTap < 420) {
+                            lastAlphabetTap = 0;
+                            lockScreen();
+                        } else {
+                            lastAlphabetTap = now;
+                        }
+                    }
+                    performClick();
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    return true;
+                default:
+                    return super.onTouchEvent(event);
+            }
+        }
+
+        @Override public boolean performClick() {
+            super.performClick();
+            return true;
+        }
+    }
+
+
+    private final class SearchGlyphView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        SearchGlyphView(int tint) {
+            super(HomeActivity.this);
+            paint.setColor(tint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(1.8f));
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            setClickable(true);
+        }
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f;
+            float r = dp(5);
+            canvas.drawCircle(cx - dp(1), cy - dp(1), r, paint);
+            canvas.drawLine(cx + dp(3), cy + dp(3), cx + dp(8), cy + dp(8), paint);
         }
     }
 
@@ -283,31 +419,44 @@ public class HomeActivity extends Activity {
         super.onDestroy();
     }
 
+
     private void buildUi() {
         handler.removeCallbacks(clockTick);
         LinearLayout root = new LinearLayout(this);
         homeRoot = root;
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(22), dp(8), dp(13), dp(8));
+        root.setPadding(dp(25), dp(10), dp(7), dp(7));
         root.setBackgroundColor(Color.TRANSPARENT);
 
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout titleStack = column();
-        TextView brand = label("wave", 17, ACCENT);
-        brand.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        brand.setLetterSpacing(0.02f);
-        titleStack.addView(brand, params(WRAP, dp(25)));
-        dateView = label("", 12, SECONDARY);
-        titleStack.addView(dateView, params(WRAP, dp(20)));
-        header.addView(titleStack, new LinearLayout.LayoutParams(0, WRAP, 1f));
-
-        clockView = label("", 39, PRIMARY);
-        clockView.setTextSize(prefs.getInt("clock_size", 39));
+        clockView = label("", prefs.getInt("clock_size", 39), PRIMARY);
         clockView.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         clockView.setGravity(Gravity.CENTER_VERTICAL);
-        header.addView(clockView, params(WRAP, dp(52)));
         clockView.setContentDescription("시계. 두 번 누르면 화면 잠금");
+        titleStack.addView(clockView, params(WRAP, dp(52)));
+        dateView = label("", 12, SECONDARY);
+        dateView.setLetterSpacing(0.015f);
+        titleStack.addView(dateView, params(WRAP, dp(19)));
+        header.addView(titleStack, new LinearLayout.LayoutParams(0, WRAP, 1f));
+
+        SearchGlyphView searchButton = new SearchGlyphView(SECONDARY);
+        searchButton.setContentDescription("앱 검색");
+        header.addView(searchButton, params(dp(44), dp(48)));
+        searchButton.setOnClickListener(v -> {
+            boolean show = searchContainer.getVisibility() != View.VISIBLE;
+            if (!show && searchField.length() > 0) searchField.setText("");
+            setSearchVisible(show, show);
+        });
+
+        TextView more = label("⋯", 25, SECONDARY);
+        more.setGravity(Gravity.CENTER);
+        more.setContentDescription("홈 화면 메뉴");
+        more.setOnClickListener(v -> showFeatureHub());
+        header.addView(more, params(dp(40), dp(48)));
+        root.addView(header, params(MATCH, dp(74)));
+
         clockView.setOnTouchListener((view, event) -> {
             if (event.getAction() == MotionEvent.ACTION_UP && prefs.getBoolean("double_tap_lock", false)) {
                 long now = System.currentTimeMillis();
@@ -318,92 +467,67 @@ public class HomeActivity extends Activity {
             }
             return false;
         });
-        TextView more = label("···", 25, SECONDARY);
-        more.setGravity(Gravity.CENTER);
-        more.setContentDescription("Wave 기능");
-        more.setOnClickListener(v -> showFeatureHub());
-        LinearLayout.LayoutParams moreLp = params(dp(36), dp(46));
-        moreLp.leftMargin = dp(6);
-        header.addView(more, moreLp);
-        root.addView(header, params(MATCH, dp(58)));
 
         defaultHomeCard = buildDefaultHomeCard();
         LinearLayout.LayoutParams homeCardLp = params(MATCH, WRAP);
-        homeCardLp.topMargin = dp(4);
         root.addView(defaultHomeCard, homeCardLp);
         updateDefaultHomeCard();
 
         LinearLayout glance = new LinearLayout(this);
         glance.setGravity(Gravity.CENTER_VERTICAL);
-        glance.setPadding(dp(13), 0, dp(13), 0);
-        glance.setBackground(roundBg(0x66171B18, dp(17), HAIRLINE));
-        weatherView = label("◌  날씨 설정", 12, SECONDARY);
+        glance.setPadding(0, 0, dp(2), 0);
+        weatherView = label("날씨 설정", 12, SECONDARY);
         weatherView.setSingleLine(true);
         weatherView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         weatherView.setOnClickListener(v -> showWeatherLocationDialog());
         glance.addView(weatherView, new LinearLayout.LayoutParams(0, MATCH, 1f));
         View separator = new View(this);
         separator.setBackgroundColor(HAIRLINE);
-        glance.addView(separator, params(dp(1), dp(22)));
-        agendaView = label("  일정 보기  ›", 12, SECONDARY);
+        glance.addView(separator, params(dp(1), dp(16)));
+        agendaView = label("일정 보기  ›", 12, SECONDARY);
         agendaView.setGravity(Gravity.CENTER);
         agendaView.setSingleLine(true);
         agendaView.setOnClickListener(v -> showAgenda());
-        glance.addView(agendaView, params(dp(104), MATCH));
-        LinearLayout.LayoutParams glanceLp = params(MATCH, dp(42));
-        glanceLp.topMargin = dp(12);
+        LinearLayout.LayoutParams agendaLp = params(dp(112), MATCH);
+        agendaLp.leftMargin = dp(7);
+        glance.addView(agendaView, agendaLp);
+        LinearLayout.LayoutParams glanceLp = params(MATCH, dp(34));
+        glanceLp.topMargin = dp(4);
         root.addView(glance, glanceLp);
 
+        searchContainer = column();
         LinearLayout search = new LinearLayout(this);
         search.setGravity(Gravity.CENTER_VERTICAL);
-        search.setPadding(dp(15), 0, dp(12), 0);
-        search.setBackground(roundBg(0xC91B201D, dp(17), HAIRLINE));
-        TextView magnifier = label("⌕", 23, ACCENT);
-        magnifier.setGravity(Gravity.CENTER);
-        search.addView(magnifier, params(dp(28), MATCH));
+        search.setPadding(dp(2), 0, dp(4), 0);
+        SearchGlyphView magnifier = new SearchGlyphView(ACCENT);
+        magnifier.setContentDescription("검색어");
+        search.addView(magnifier, params(dp(30), MATCH));
         searchField = new EditText(this);
         searchField.setSingleLine(true);
         searchField.setTextSize(15);
         searchField.setTextColor(PRIMARY);
         searchField.setHintTextColor(SECONDARY);
-        searchField.setHint("검색 또는 앱 이름");
+        searchField.setHint("앱, 연락처 검색");
         searchField.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         searchField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         searchField.setBackgroundColor(Color.TRANSPARENT);
-        searchField.setPadding(dp(8), 0, dp(6), 0);
+        searchField.setPadding(dp(7), 0, dp(6), 0);
         searchField.setTypeface(Typeface.create(prefs.getString("font_family", "sans-serif"), Typeface.NORMAL));
         search.addView(searchField, new LinearLayout.LayoutParams(0, MATCH, 1f));
-        clearSearch = label("×", 24, SECONDARY);
+        clearSearch = label("×", 23, SECONDARY);
         clearSearch.setGravity(Gravity.CENTER);
         clearSearch.setVisibility(View.GONE);
         clearSearch.setContentDescription("검색 지우기");
-        search.addView(clearSearch, params(dp(32), MATCH));
+        search.addView(clearSearch, params(dp(34), MATCH));
         clearSearch.setOnClickListener(v -> searchField.setText(""));
-        LinearLayout.LayoutParams searchLp = params(MATCH, dp(49));
-        searchLp.topMargin = dp(9);
-        root.addView(search, searchLp);
-
-        LinearLayout categoriesHeading = new LinearLayout(this);
-        categoriesHeading.setGravity(Gravity.CENTER_VERTICAL);
-        TextView categoryLabel = label("앱 모음", 13, SECONDARY);
-        categoryLabel.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        categoriesHeading.addView(categoryLabel, new LinearLayout.LayoutParams(0, MATCH, 1f));
-        TextView manage = label("편집  ＋", 12, ACCENT);
-        manage.setGravity(Gravity.CENTER);
-        manage.setPadding(dp(9), 0, dp(2), 0);
-        manage.setOnClickListener(v -> manageGroups());
-        categoriesHeading.addView(manage, params(WRAP, MATCH));
-        LinearLayout.LayoutParams categoryHeadingLp = params(MATCH, dp(30));
-        categoryHeadingLp.topMargin = dp(5);
-        root.addView(categoriesHeading, categoryHeadingLp);
-
-        HorizontalScrollView categoryScroll = new HorizontalScrollView(this);
-        categoryScroll.setHorizontalScrollBarEnabled(false);
-        categoryRow = new LinearLayout(this);
-        categoryRow.setOrientation(LinearLayout.HORIZONTAL);
-        categoryRow.setGravity(Gravity.CENTER_VERTICAL);
-        categoryScroll.addView(categoryRow);
-        root.addView(categoryScroll, params(MATCH, dp(36)));
+        searchContainer.addView(search, params(MATCH, dp(42)));
+        View searchRule = new View(this);
+        searchRule.setBackgroundColor(HAIRLINE);
+        searchContainer.addView(searchRule, params(MATCH, dp(1)));
+        searchContainer.setVisibility(currentQuery.isEmpty() ? View.GONE : View.VISIBLE);
+        LinearLayout.LayoutParams searchLp = params(MATCH, WRAP);
+        searchLp.topMargin = dp(2);
+        root.addView(searchContainer, searchLp);
 
         LinearLayout listAndIndex = new LinearLayout(this);
         listAndIndex.setOrientation(LinearLayout.HORIZONTAL);
@@ -413,44 +537,13 @@ public class HomeActivity extends Activity {
         listScroll.setFillViewport(false);
         listScroll.setVerticalScrollBarEnabled(false);
         contentArea = column();
-        contentArea.setPadding(0, dp(6), dp(6), dp(20));
+        contentArea.setPadding(0, dp(5), dp(3), dp(20));
         listScroll.addView(contentArea);
         listAndIndex.addView(listScroll, new LinearLayout.LayoutParams(0, MATCH, 1f));
-        alphabetRail = new LinearLayout(this);
-        alphabetRail.setOrientation(LinearLayout.VERTICAL);
-        alphabetRail.setGravity(Gravity.CENTER);
-        listAndIndex.addView(alphabetRail, params(dp(22), MATCH));
+        alphabetRail = new AlphabetIndexView();
+        alphabetRail.setPadding(0, dp(7), 0, dp(7));
+        listAndIndex.addView(alphabetRail, params(dp(27), MATCH));
         root.addView(listAndIndex, listAndIndexLp);
-
-        LinearLayout footer = new LinearLayout(this);
-        footer.setGravity(Gravity.CENTER_VERTICAL);
-        footer.setPadding(0, dp(5), 0, dp(2));
-        TextView wallpaperAction = footerAction("◉", "배경");
-        wallpaperAction.setOnClickListener(v -> openWallpaperStudio());
-        footer.addView(wallpaperAction, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        TextView widgetAction = footerAction("▦", "위젯");
-        widgetAction.setOnClickListener(v -> showWidgetStack());
-        footer.addView(widgetAction, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        TextView focusAction = footerAction("◷", "집중");
-        focusAction.setOnClickListener(v -> showUsageBreakerSettings());
-        footer.addView(focusAction, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        TextView featureAction = footerAction("＋", "더 보기");
-        featureAction.setTextColor(ACCENT);
-        String quickLabel = quickActionLabel(prefs.getString("quick_button", ""));
-        if (!quickLabel.isEmpty()) featureAction.setText("◈\n" + quickLabel);
-        featureAction.setOnClickListener(v -> runQuickAction("quick_button"));
-        featureAction.setOnLongClickListener(v -> { chooseQuickAction("quick_button"); return true; });
-        final float[] quickStartY = {0};
-        featureAction.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) quickStartY[0] = event.getY();
-            else if (event.getAction() == MotionEvent.ACTION_UP && quickStartY[0] - event.getY() > dp(24)) {
-                runQuickAction("quick_button_secondary");
-                return true;
-            }
-            return false;
-        });
-        footer.addView(featureAction, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        root.addView(footer, params(MATCH, dp(50)));
 
         setContentView(root);
         if (!currentQuery.isEmpty()) {
@@ -467,10 +560,33 @@ public class HomeActivity extends Activity {
             }
             @Override public void afterTextChanged(Editable s) { }
         });
+        searchField.setOnEditorActionListener((text, actionId, event) -> {
+            InputMethodManager input = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (input != null) input.hideSoftInputFromWindow(searchField.getWindowToken(), 0);
+            return true;
+        });
         renderHome();
         refreshWeather();
         handler.post(clockTick);
     }
+
+    private void setSearchVisible(boolean visible, boolean focus) {
+        if (searchContainer == null) return;
+        searchContainer.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (!visible) {
+            InputMethodManager input = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (input != null && searchField != null) input.hideSoftInputFromWindow(searchField.getWindowToken(), 0);
+            return;
+        }
+        if (focus && searchField != null) {
+            searchField.requestFocus();
+            searchField.post(() -> {
+                InputMethodManager input = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (input != null) input.showSoftInput(searchField, InputMethodManager.SHOW_IMPLICIT);
+            });
+        }
+    }
+
 
     private TextView footerAction(String glyph, String title) {
         TextView action = label(glyph + "\n" + title, 11, SECONDARY);
@@ -530,23 +646,25 @@ public class HomeActivity extends Activity {
         else showFeatureHub();
     }
 
+
     private View buildDefaultHomeCard() {
         LinearLayout card = new LinearLayout(this);
         card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(15), dp(4), dp(13), dp(4));
-        card.setBackground(roundBg(0xCC1B292B, dp(18), 0x449BE8CF));
+        card.setPadding(0, 0, 0, 0);
         LinearLayout textColumn = column();
-        TextView title = label("Wave Home을 기본 홈으로 설정", 14, PRIMARY);
-        title.setTypeface(null, Typeface.BOLD);
-        textColumn.addView(title);
-        textColumn.addView(label("홈 버튼을 누르면 이 화면이 열립니다.", 11, SECONDARY));
+        TextView title = label("기본 홈으로 설정", 13, ACCENT);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        textColumn.addView(title, params(WRAP, dp(21)));
+        textColumn.addView(label("홈 버튼을 누르면 Wave가 열립니다.", 11, SECONDARY), params(WRAP, dp(17)));
         card.addView(textColumn, new LinearLayout.LayoutParams(0, WRAP, 1f));
-        TextView choose = label("설정", 13, ACCENT);
+        TextView choose = label("설정  ›", 12, ACCENT);
         choose.setGravity(Gravity.CENTER);
-        card.addView(choose, params(dp(48), dp(44)));
+        card.addView(choose, params(dp(60), dp(40)));
+        card.setMinimumHeight(dp(46));
         card.setOnClickListener(v -> requestDefaultHome());
         return card;
     }
+
 
     private void updateDefaultHomeCard() {
         if (defaultHomeCard != null) defaultHomeCard.setVisibility(isDefaultHome() ? View.GONE : View.VISIBLE);
@@ -575,6 +693,7 @@ public class HomeActivity extends Activity {
         startActivity(new Intent(this, WallpaperStudioActivity.class));
     }
 
+
     private void renderHome() {
         if (selectedGroupId != null && !selectedGroupId.isEmpty()
                 && !FAVORITES_FILTER.equals(selectedGroupId) && findGroup(selectedGroupId) == null) {
@@ -588,49 +707,7 @@ public class HomeActivity extends Activity {
     }
 
     private void renderCategoryChips() {
-        if (categoryRow == null) return;
-        categoryRow.removeAllViews();
-        addCategoryChip("전체", "", installedApps.size());
-        addCategoryChip("★ 즐겨찾기", FAVORITES_FILTER, favorites().size());
-        for (AppGroup group : customGroups()) {
-            addCategoryChip(group.name, group.id, countInGroup(group.id));
-        }
-        TextView add = label("＋", 19, ACCENT);
-        add.setGravity(Gravity.CENTER);
-        add.setBackground(roundBg(0x44111119, dp(16), HAIRLINE));
-        add.setContentDescription("분류 추가");
-        LinearLayout.LayoutParams addLp = params(dp(38), dp(31));
-        addLp.leftMargin = dp(3);
-        categoryRow.addView(add, addLp);
-        add.setOnClickListener(v -> createGroup());
-    }
-
-    private void addCategoryChip(String title, String id, int count) {
-        boolean selected = id.equals(selectedGroupId);
-        TextView chip = label(title + "  " + count, 11, selected ? 0xFF141A12 : SECONDARY);
-        chip.setGravity(Gravity.CENTER);
-        chip.setPadding(dp(11), 0, dp(11), 0);
-        chip.setBackground(roundBg(selected ? ACCENT : PANEL, dp(16),
-                selected ? Color.TRANSPARENT : HAIRLINE));
-        LinearLayout.LayoutParams lp = params(WRAP, dp(30));
-        lp.rightMargin = dp(7);
-        categoryRow.addView(chip, lp);
-        chip.setOnClickListener(v -> {
-            selectedGroupId = id;
-            prefs.edit().putString("last_group", id).apply();
-            renderHome();
-        });
-        if (!id.isEmpty() && !FAVORITES_FILTER.equals(id)) {
-            chip.setOnLongClickListener(v -> {
-                AppGroup group = findGroup(id);
-                if (group != null) new AlertDialog.Builder(this).setTitle(group.name)
-                        .setItems(new String[]{"팝업으로 열기", "분류 편집"}, (dialog, which) -> {
-                            if (which == 0) showGroupPopup(group);
-                            else manageGroup(group);
-                        }).show();
-                return true;
-            });
-        }
+        if (categoryRow != null) categoryRow.removeAllViews();
     }
 
     private void renderContent() {
@@ -638,14 +715,30 @@ public class HomeActivity extends Activity {
         contentArea.removeAllViews();
         sectionY.clear();
         sectionOrder.clear();
-        String query = currentQuery.trim().toLowerCase(Locale.getDefault());
-        boolean showDiscovery = query.isEmpty() && selectedGroupId.isEmpty();
 
-        if (showDiscovery) {
-            addHorizontalSection("즐겨찾기", appsForPackages(favorites()), "별표를 눌러 자주 쓰는 앱을 고정하세요.");
-            List<AppEntry> recent = appsForPackages(recentPackages());
-            if (!recent.isEmpty()) addHorizontalSection("최근 실행", recent, null);
+        String query = currentQuery.trim().toLowerCase(Locale.getDefault());
+        boolean showFavorites = query.isEmpty() && selectedGroupId.isEmpty();
+
+        if (showFavorites) {
+            List<AppEntry> favoriteApps = orderedFavorites();
+            TextView favoriteHeading = label("즐겨찾기", 14, PRIMARY);
+            favoriteHeading.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            LinearLayout.LayoutParams favHeadingLp = params(MATCH, dp(32));
+            contentArea.addView(favoriteHeading, favHeadingLp);
+            if (favoriteApps.isEmpty()) {
+                TextView hint = label("앱을 길게 눌러 즐겨찾기에 추가하세요.", 12, SECONDARY);
+                contentArea.addView(hint, params(MATCH, dp(30)));
+            } else {
+                for (AppEntry app : favoriteApps) {
+                    contentArea.addView(appRow(app, true), params(MATCH, WRAP));
+                }
+            }
             if (headsetConnected) addMusicSuggestion();
+            View divider = new View(this);
+            divider.setBackgroundColor(HAIRLINE);
+            LinearLayout.LayoutParams dividerLp = params(MATCH, dp(1));
+            dividerLp.topMargin = dp(7);
+            contentArea.addView(divider, dividerLp);
         }
 
         ArrayList<AppEntry> filtered = new ArrayList<>();
@@ -664,44 +757,61 @@ public class HomeActivity extends Activity {
                 : selectedGroup == null ? "모든 앱" : selectedGroup.name;
         LinearLayout titleRow = new LinearLayout(this);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView heading = label(title, 17, PRIMARY);
-        heading.setTypeface(null, Typeface.BOLD);
-        titleRow.addView(heading, new LinearLayout.LayoutParams(0, dp(42), 1f));
-        TextView count = label(filtered.size() + "개", 12, SECONDARY);
-        titleRow.addView(count, params(WRAP, dp(42)));
-        contentArea.addView(titleRow, params(MATCH, dp(42)));
+        TextView heading = label(title, 14, PRIMARY);
+        heading.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        titleRow.addView(heading, new LinearLayout.LayoutParams(0, dp(43), 1f));
+        String filterName = selectedGroup != null ? selectedGroup.name
+                : FAVORITES_FILTER.equals(selectedGroupId) ? "즐겨찾기" : "전체 앱";
+        TextView filter = label("⌄  " + filterName, 12, ACCENT);
+        filter.setGravity(Gravity.CENTER);
+        filter.setPadding(dp(8), 0, dp(2), 0);
+        filter.setContentDescription("앱 분류 선택");
+        titleRow.addView(filter, params(WRAP, dp(42)));
+        filter.setOnClickListener(v -> showGroupPicker());
+        filter.setOnLongClickListener(v -> {
+            if (selectedGroup == null) {
+                manageGroups();
+            } else {
+                new AlertDialog.Builder(this).setTitle(selectedGroup.name)
+                        .setItems(new String[]{"팝업으로 열기", "앱 추가", "분류 편집"}, (dialog, which) -> {
+                            if (which == 0) showGroupPopup(selectedGroup);
+                            else if (which == 1) bulkAssignToGroup(selectedGroup);
+                            else manageGroup(selectedGroup);
+                        }).show();
+            }
+            return true;
+        });
+        contentArea.addView(titleRow, params(MATCH, dp(43)));
 
         if (selectedGroup != null) {
             LinearLayout actions = new LinearLayout(this);
             actions.setGravity(Gravity.CENTER_VERTICAL);
             TextView addApps = smallAction("＋ 앱 추가");
-            actions.addView(addApps, params(WRAP, dp(34)));
+            actions.addView(addApps, params(WRAP, dp(32)));
             addApps.setOnClickListener(v -> bulkAssignToGroup(selectedGroup));
             TextView edit = smallAction("분류 편집");
-            LinearLayout.LayoutParams editLp = params(WRAP, dp(34));
+            LinearLayout.LayoutParams editLp = params(WRAP, dp(32));
             editLp.leftMargin = dp(6);
             actions.addView(edit, editLp);
             edit.setOnClickListener(v -> manageGroup(selectedGroup));
-            LinearLayout.LayoutParams actionsLp = params(MATCH, dp(38));
-            actionsLp.bottomMargin = dp(2);
-            contentArea.addView(actions, actionsLp);
-        } else if (customGroups().isEmpty() && query.isEmpty()) {
-            TextView hint = label("분류를 만들고 앱을 묶으면 원하는 방식으로 정리할 수 있어요.", 12, SECONDARY);
-            contentArea.addView(hint, params(MATCH, dp(30)));
+            contentArea.addView(actions, params(MATCH, dp(36)));
         }
 
         if (filtered.isEmpty()) {
-            TextView empty = label(query.isEmpty() ? "여기에 표시할 앱이 없습니다." : "검색 결과가 없습니다.", 14, SECONDARY);
-            empty.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams emptyLp = params(MATCH, dp(96));
-            contentArea.addView(empty, emptyLp);
+            String message = query.isEmpty() ? "이 분류에는 앱이 없습니다." : "검색 결과가 없습니다.";
+            TextView empty = label(message, 13, SECONDARY);
+            empty.setGravity(Gravity.CENTER_VERTICAL);
+            contentArea.addView(empty, params(MATCH, dp(64)));
             if (selectedGroup != null && query.isEmpty()) {
                 TextView addApps = smallAction("이 분류에 앱 추가");
                 addApps.setGravity(Gravity.CENTER);
-                contentArea.addView(addApps, params(MATCH, dp(46)));
+                contentArea.addView(addApps, params(MATCH, dp(42)));
                 addApps.setOnClickListener(v -> bulkAssignToGroup(selectedGroup));
             }
-            if (!query.isEmpty()) { addContactSearchRow(); addWebSearchRow(); }
+            if (!query.isEmpty()) {
+                addContactSearchRow();
+                addWebSearchRow();
+            }
             return;
         }
 
@@ -711,18 +821,47 @@ public class HomeActivity extends Activity {
             if (!section.equals(lastSection) && query.isEmpty()) {
                 sectionY.put(section, contentArea.getChildCount());
                 sectionOrder.add(section);
-                TextView letter = label(section, 11, ACCENT);
-                letter.setTypeface(null, Typeface.BOLD);
-                letter.setLetterSpacing(0.12f);
-                LinearLayout.LayoutParams sectionLp = params(MATCH, dp(28));
-                sectionLp.topMargin = dp(6);
+                TextView letter = label(section, 10, ACCENT);
+                letter.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+                letter.setLetterSpacing(0.09f);
+                LinearLayout.LayoutParams sectionLp = params(MATCH, dp(27));
+                sectionLp.topMargin = dp(5);
                 contentArea.addView(letter, sectionLp);
                 lastSection = section;
             }
             contentArea.addView(appRow(app), params(MATCH, WRAP));
         }
-        if (!query.isEmpty()) { addContactSearchRow(); addWebSearchRow(); }
+        if (!query.isEmpty()) {
+            addContactSearchRow();
+            addWebSearchRow();
+        }
     }
+
+    private void showGroupPicker() {
+        ArrayList<String> labels = new ArrayList<>();
+        ArrayList<String> ids = new ArrayList<>();
+        labels.add("전체 앱   ·   " + installedApps.size());
+        ids.add("");
+        labels.add("즐겨찾기   ·   " + favorites().size());
+        ids.add(FAVORITES_FILTER);
+        for (AppGroup group : customGroups()) {
+            labels.add(group.name + "   ·   " + countInGroup(group.id));
+            ids.add(group.id);
+        }
+        new AlertDialog.Builder(this).setTitle("앱 분류")
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    if (which < 0 || which >= ids.size()) return;
+                    selectedGroupId = ids.get(which);
+                    prefs.edit().putString("last_group", selectedGroupId).apply();
+                    if (listScroll != null) listScroll.scrollTo(0, 0);
+                    renderHome();
+                })
+                .setNeutralButton("분류 관리", (dialog, which) -> manageGroups())
+                .setPositiveButton("새 분류", (dialog, which) -> createGroup())
+                .setNegativeButton("닫기", null)
+                .show();
+    }
+
 
     private void addContactSearchRow() {
         TextView contacts = label("⌕  연락처에서 ‘" + currentQuery.trim() + "’ 찾기  ›", 13, SECONDARY);
@@ -794,38 +933,19 @@ public class HomeActivity extends Activity {
         });
     }
 
+
     private void renderAlphabetRail() {
         if (alphabetRail == null) return;
-        alphabetRail.removeAllViews();
-        for (String section : sectionOrder) {
-            TextView letter = label(section, 8.7f, SECONDARY);
-            letter.setGravity(Gravity.CENTER);
-            alphabetRail.addView(letter, new LinearLayout.LayoutParams(MATCH, 0, 1f));
-            letter.setOnClickListener(v -> {
-                long now = System.currentTimeMillis();
-                if (prefs.getBoolean("double_tap_lock", false) && now - lastAlphabetTap < 420) {
-                    lastAlphabetTap = 0;
-                    lockScreen();
-                    return;
-                }
-                lastAlphabetTap = now;
-                Integer index = sectionY.get(section);
-                if (index == null || index >= contentArea.getChildCount()) return;
-                contentArea.post(() -> listScroll.smoothScrollTo(0, contentArea.getChildAt(index).getTop()));
-            });
-        }
+        alphabetRail.setSections(sectionOrder);
     }
 
     private void addMusicSuggestion() {
         Intent musicIntent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_MUSIC);
         List<ResolveInfo> players = getPackageManager().queryIntentActivities(musicIntent, 0);
         if (players.isEmpty()) return;
-        TextView suggestion = label("♫  헤드폰이 연결됐어요  ·  음악 앱 열기", 12, PRIMARY);
+        TextView suggestion = label("♫   헤드폰 연결됨 · 음악 앱 열기", 12, SECONDARY);
         suggestion.setGravity(Gravity.CENTER_VERTICAL);
-        suggestion.setPadding(dp(12), 0, dp(10), 0);
-        suggestion.setBackground(roundBg(0x6630432B, dp(14), 0x446B9F55));
-        LinearLayout.LayoutParams lp = params(MATCH, dp(40));
-        lp.bottomMargin = dp(6);
+        LinearLayout.LayoutParams lp = params(MATCH, dp(34));
         contentArea.addView(suggestion, lp);
         suggestion.setOnClickListener(v -> {
             try { startActivity(musicIntent); }
@@ -838,6 +958,7 @@ public class HomeActivity extends Activity {
             }
         });
     }
+
 
     private void addHorizontalSection(String title, List<AppEntry> apps, String emptyText) {
         if (apps.isEmpty() && emptyText == null) return;
@@ -880,61 +1001,83 @@ public class HomeActivity extends Activity {
         contentArea.addView(scroller, params(MATCH, dp(68)));
     }
 
+
     private View appRow(AppEntry app) {
+        return appRow(app, false);
+    }
+
+    private View appRow(AppEntry app, boolean favorite) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(2), dp(4), 0, dp(4));
+        row.setPadding(0, dp(2), 0, dp(2));
         ImageView icon = new ImageView(this);
         setAppIcon(icon, app);
         icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        row.addView(icon, new LinearLayout.LayoutParams(dp(39), dp(39)));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
-        LinearLayout textColumn = column();
-        TextView name = label(app.label, 15, PRIMARY);
+        TextView name = label(app.label, 16, PRIMARY);
         name.setSingleLine(true);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        textColumn.addView(name, params(MATCH, dp(25)));
-        String groupNames = groupNamesFor(app.packageName);
-        TextView details = label(groupNames.isEmpty() ? "" : groupNames, 10, SECONDARY);
-        details.setSingleLine(true);
-        details.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        if (!groupNames.isEmpty()) textColumn.addView(details, params(MATCH, dp(16)));
-        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(0, WRAP, 1f);
-        textLp.leftMargin = dp(12);
-        row.addView(textColumn, textLp);
+        LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(0, MATCH, 1f);
+        nameLp.leftMargin = dp(14);
+        row.addView(name, nameLp);
 
-        TextView categories = label("⌄", 18, groupNames.isEmpty() ? SECONDARY : ACCENT);
-        categories.setGravity(Gravity.CENTER);
-        categories.setContentDescription("분류 지정");
-        row.addView(categories, params(dp(40), dp(48)));
-        categories.setOnClickListener(v -> editAppGroups(app));
-
-        boolean isFavorite = favorites().contains(app.packageName);
-        TextView star = label(isFavorite ? "★" : "☆", 19, isFavorite ? ACCENT : SECONDARY);
-        star.setGravity(Gravity.CENTER);
-        star.setContentDescription(isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가");
-        row.addView(star, params(dp(40), dp(48)));
-        star.setOnClickListener(v -> toggleFavorite(app.packageName));
-
-        row.setMinimumHeight(dp(59));
+        if (favorite) {
+            TextView star = label("★", 14, ACCENT);
+            star.setGravity(Gravity.CENTER);
+            star.setContentDescription("즐겨찾기 해제");
+            row.addView(star, params(dp(38), dp(48)));
+            star.setOnClickListener(v -> toggleFavorite(app.packageName));
+        }
+        row.setMinimumHeight(dp(60));
         row.setOnClickListener(v -> launch(app));
         row.setOnLongClickListener(v -> {
             showAppPopup(app);
             return true;
         });
+        final float[] swipeStart = {0, 0};
+        final boolean[] swipeRight = {false};
+        row.setOnTouchListener((view, event) -> {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                swipeStart[0] = event.getX();
+                swipeStart[1] = event.getY();
+                swipeRight[0] = false;
+            } else if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
+                float dx = event.getX() - swipeStart[0];
+                float dy = event.getY() - swipeStart[1];
+                if (dx > dp(34) && dx > Math.abs(dy) * 1.3f) {
+                    swipeRight[0] = true;
+                    if (view.getParent() != null) view.getParent().requestDisallowInterceptTouchEvent(true);
+                }
+            } else if (event.getActionMasked() == MotionEvent.ACTION_UP && swipeRight[0]) {
+                float dx = event.getX() - swipeStart[0];
+                swipeRight[0] = false;
+                if (dx > dp(58)) {
+                    showAppPopup(app);
+                    return true;
+                }
+            } else if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                swipeRight[0] = false;
+            }
+            return false;
+        });
+
         View divider = new View(this);
-        divider.setBackgroundColor(0x1FFFFFFF);
+        divider.setBackgroundColor(0x1AFFFFFF);
         LinearLayout.LayoutParams dividerLp = params(MATCH, dp(1));
+        dividerLp.leftMargin = dp(54);
         LinearLayout item = column();
-        item.addView(row, params(MATCH, dp(60)));
+        item.addView(row, params(MATCH, dp(61)));
         item.addView(divider, dividerLp);
         return item;
     }
+
 
     private void showAppActions(AppEntry app) {
         boolean isFavorite = favorites().contains(app.packageName);
         ArrayList<String> actions = new ArrayList<>();
         actions.add(isFavorite ? "즐겨찾기 해제" : "즐겨찾기에 추가");
+        if (isFavorite) actions.add("즐겨찾기 순서 변경");
         actions.add("앱 모음 지정");
         actions.add("아이콘 바꾸기");
         if (iconOverrides().containsKey(app.packageName)) actions.add("아이콘 원래대로");
@@ -942,7 +1085,8 @@ public class HomeActivity extends Activity {
         new AlertDialog.Builder(this).setTitle(app.label)
                 .setItems(actions.toArray(new String[0]), (dialog, which) -> {
                     String selected = actions.get(which);
-                    if (selected.startsWith("즐겨찾기")) toggleFavorite(app.packageName);
+                    if (selected.equals("즐겨찾기 순서 변경")) changeFavoriteOrder(app);
+                    else if (selected.startsWith("즐겨찾기")) toggleFavorite(app.packageName);
                     else if (selected.equals("앱 모음 지정")) editAppGroups(app);
                     else if (selected.equals("아이콘 바꾸기")) chooseIcon(app.packageName);
                     else if (selected.equals("아이콘 원래대로")) resetIcon(app.packageName);
@@ -1092,9 +1236,21 @@ public class HomeActivity extends Activity {
         }
     }
 
+
     private void showFeatureHub() {
-        String[] features = {"테마 라이브러리", "글꼴 · 시계 · 아이콘", "위젯 스택", "캘린더 일정", "사용 시간 알림", "배경화면 스튜디오", "앱 모음 관리", "기본 홈 앱 선택"};
-        new AlertDialog.Builder(this).setTitle("Wave Home")
+        String quickLabel = quickActionLabel(prefs.getString("quick_button", ""));
+        String[] features = {
+                "테마 라이브러리",
+                "글꼴 · 시계 · 아이콘",
+                "위젯 스택",
+                "캘린더 일정",
+                "사용 시간 알림",
+                "배경화면 스튜디오",
+                "앱 분류 관리",
+                quickLabel.isEmpty() ? "빠른 실행 지정" : "빠른 실행 · " + quickLabel,
+                "기본 홈 앱 선택"
+        };
+        new AlertDialog.Builder(this).setTitle("홈 화면")
                 .setItems(features, (dialog, which) -> {
                     switch (which) {
                         case 0: showThemeLibrary(); break;
@@ -1104,10 +1260,15 @@ public class HomeActivity extends Activity {
                         case 4: showUsageBreakerSettings(); break;
                         case 5: openWallpaperStudio(); break;
                         case 6: manageGroups(); break;
-                        case 7: requestDefaultHome(); break;
+                        case 7:
+                            if (quickLabel.isEmpty()) chooseQuickAction("quick_button");
+                            else runQuickAction("quick_button");
+                            break;
+                        case 8: requestDefaultHome(); break;
                     }
                 }).show();
     }
+
 
     private void showThemeLibrary() {
         String[] choices = {"이끼 정원   ·   Sage", "푸른 새벽   ·   Ocean", "장미 안개   ·   Rose", "황혼빛   ·   Amber", "라일락 밤   ·   Violet", "테마 파일 불러오기", "내 테마 내보내기"};
@@ -1685,13 +1846,72 @@ public class HomeActivity extends Activity {
 
     private void toggleFavorite(String packageName) {
         Set<String> next = favorites();
-        if (!next.add(packageName)) next.remove(packageName);
+        ArrayList<String> order = favoriteOrder();
+        if (!next.add(packageName)) {
+            next.remove(packageName);
+            order.remove(packageName);
+        } else if (!order.contains(packageName)) {
+            order.add(packageName);
+        }
         prefs.edit().putStringSet("favorites", next).apply();
+        saveFavoriteOrder(order);
         renderHome();
     }
 
     private Set<String> favorites() {
         return new HashSet<>(prefs.getStringSet("favorites", new HashSet<>()));
+    }
+
+    private ArrayList<String> favoriteOrder() {
+        Set<String> selected = favorites();
+        ArrayList<String> order = new ArrayList<>();
+        try {
+            JSONArray saved = new JSONArray(prefs.getString("favorite_order", "[]"));
+            for (int i = 0; i < saved.length(); i++) {
+                String pkg = saved.optString(i, "");
+                if (selected.contains(pkg) && !order.contains(pkg)) order.add(pkg);
+            }
+        } catch (Exception ignored) { }
+        for (AppEntry app : installedApps) {
+            if (selected.contains(app.packageName) && !order.contains(app.packageName)) order.add(app.packageName);
+        }
+        return order;
+    }
+
+    private List<AppEntry> orderedFavorites() {
+        HashMap<String, AppEntry> byPackage = new HashMap<>();
+        for (AppEntry app : installedApps) byPackage.put(app.packageName, app);
+        ArrayList<AppEntry> result = new ArrayList<>();
+        for (String pkg : favoriteOrder()) {
+            AppEntry app = byPackage.get(pkg);
+            if (app != null) result.add(app);
+        }
+        return result;
+    }
+
+    private void saveFavoriteOrder(List<String> order) {
+        JSONArray saved = new JSONArray();
+        for (String pkg : order) saved.put(pkg);
+        prefs.edit().putString("favorite_order", saved.toString()).apply();
+    }
+
+    private void changeFavoriteOrder(AppEntry app) {
+        ArrayList<String> order = favoriteOrder();
+        int current = order.indexOf(app.packageName);
+        if (current < 0) return;
+        String[] choices = {"맨 위로", "한 칸 위로", "한 칸 아래로", "맨 아래로"};
+        new AlertDialog.Builder(this).setTitle(app.label + " · 즐겨찾기 순서")
+                .setItems(choices, (dialog, which) -> {
+                    order.remove(app.packageName);
+                    int destination;
+                    if (which == 0) destination = 0;
+                    else if (which == 1) destination = Math.max(0, current - 1);
+                    else if (which == 2) destination = Math.min(order.size(), current + 1);
+                    else destination = order.size();
+                    order.add(Math.max(0, Math.min(destination, order.size())), app.packageName);
+                    saveFavoriteOrder(order);
+                    renderHome();
+                }).show();
     }
 
     private void editAppGroups(AppEntry app) {
@@ -2117,9 +2337,14 @@ public class HomeActivity extends Activity {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
     private LinearLayout.LayoutParams params(int width, int height) {
         return new LinearLayout.LayoutParams(width, height);
     }
+
 
     @Override
     public void onBackPressed() {
@@ -2129,8 +2354,13 @@ public class HomeActivity extends Activity {
             if (input != null) input.hideSoftInputFromWindow(searchField.getWindowToken(), 0);
             return;
         }
+        if (searchContainer != null && searchContainer.getVisibility() == View.VISIBLE) {
+            setSearchVisible(false, false);
+            return;
+        }
         if (!isDefaultHome()) super.onBackPressed();
     }
+
 
     private static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
     private static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
