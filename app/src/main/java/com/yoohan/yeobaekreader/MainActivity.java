@@ -123,7 +123,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("reader", MODE_PRIVATE);
         textSize = prefs.getInt("textSize", 21);
         lineSpacing = prefs.getFloat("lineSpacing", 1.9f);
-        brightness = prefs.getInt("brightness", 100);
+        brightness = Math.max(10, Math.min(100, prefs.getInt("brightness", 100)));
         theme = prefs.getString("theme", "paper");
         width = prefs.getString("width", "medium");
         Uri incoming = getIntent() == null ? null : getIntent().getData();
@@ -219,7 +219,7 @@ public class MainActivity extends Activity {
         window.setStatusBarColor(paperColor());
         window.setNavigationBarColor(paperColor());
         WindowManager.LayoutParams attrs = window.getAttributes();
-        attrs.screenBrightness = Math.max(0.5f, Math.min(1f, brightness / 100f));
+        attrs.screenBrightness = Math.max(0.1f, Math.min(1f, brightness / 100f));
         window.setAttributes(attrs);
         if (Build.VERSION.SDK_INT >= 23) {
             View decor = window.getDecorView();
@@ -243,68 +243,43 @@ public class MainActivity extends Activity {
         chapterHeading = null;
         readerTitle = null;
         LinearLayout outer = column();
-        outer.setPadding(dp(20), dp(10), dp(20), dp(12));
+        outer.setPadding(dp(18), dp(8), dp(18), dp(12));
         installScreen(outer);
 
         LinearLayout brand = row();
         TextView mark = text("여", 18, Color.WHITE, true);
         mark.setGravity(Gravity.CENTER);
         mark.setBackground(roundRect(GREEN, dp(12)));
-        LinearLayout.LayoutParams markLp = new LinearLayout.LayoutParams(dp(36), dp(36));
+        LinearLayout.LayoutParams markLp = new LinearLayout.LayoutParams(dp(40), dp(40));
         brand.addView(mark, markLp);
-        TextView brandName = text("  여백", 19, textColor(), true);
-        brand.addView(brandName, new LinearLayout.LayoutParams(0, dp(48), 1));
-        Button open = button("책 파일 열기  ＋", true);
-        open.setOnClickListener(v -> pickBook());
-        brand.addView(open);
+        LinearLayout brandText = column();
+        TextView brandName = text("여백", 18, textColor(), true);
+        TextView brandHint = text("TXT · EPUB 소설 리더", 11, mutedColor(), false);
+        brandText.addView(brandName);
+        brandText.addView(brandHint);
+        LinearLayout.LayoutParams brandTextLp = new LinearLayout.LayoutParams(0, -2, 1);
+        brandTextLp.leftMargin = dp(11);
+        brand.addView(brandText, brandTextLp);
         outer.addView(brand);
+
+        Button open = button("책 파일 열기", true);
+        open.setMinHeight(dp(50));
+        open.setOnClickListener(v -> pickBook());
+        LinearLayout.LayoutParams openLp = new LinearLayout.LayoutParams(-1, -2);
+        openLp.topMargin = dp(16);
+        outer.addView(open, openLp);
 
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = column();
-        content.setPadding(0, dp(25), 0, dp(25));
-        TextView eyebrow = text("TXT  ·  EPUB  ·  소설 읽기", 12, GREEN, true);
-        content.addView(eyebrow);
-        TextView title = text("소설을 읽는\n나만의 여백", 34, textColor(), true);
-        title.setLineSpacing(dp(4), 1f);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.topMargin = dp(12);
-        content.addView(title, titleLp);
-        TextView intro = text("글자 크기와 줄 간격을 편하게 맞추고,\n읽던 곳부터 이어 읽으세요.", 15, mutedColor(), false);
-        intro.setLineSpacing(dp(5), 1f);
-        LinearLayout.LayoutParams introLp = new LinearLayout.LayoutParams(-1, -2);
-        introLp.topMargin = dp(12);
-        content.addView(intro, introLp);
+        content.setPadding(0, dp(22), 0, dp(20));
 
-        LinearLayout openCard = column();
-        openCard.setPadding(dp(18), dp(18), dp(18), dp(18));
-        openCard.setBackground(roundRect("night".equals(theme) ? Color.rgb(43, 51, 44) : Color.rgb(231, 236, 226), dp(20)));
-        TextView cardTitle = text("책을 열어 읽기 시작하세요", 16, textColor(), true);
-        openCard.addView(cardTitle);
-        TextView cardCopy = text("파일은 앱 안에서 열리며 인터넷으로 전송되지 않습니다.", 12, mutedColor(), false);
-        LinearLayout.LayoutParams ccLp = new LinearLayout.LayoutParams(-1, -2);
-        ccLp.topMargin = dp(7);
-        openCard.addView(cardCopy, ccLp);
-        Button choose = button("기기에서 TXT / EPUB 선택", true);
-        choose.setOnClickListener(v -> pickBook());
-        LinearLayout.LayoutParams chooseLp = new LinearLayout.LayoutParams(-2, -2);
-        chooseLp.topMargin = dp(17);
-        openCard.addView(choose, chooseLp);
-        LinearLayout.LayoutParams openLp = new LinearLayout.LayoutParams(-1, -2);
-        openLp.topMargin = dp(24);
-        content.addView(openCard, openLp);
-
-        TextView recentTitle = text("최근 읽은 책", 19, textColor(), true);
+        TextView recentTitle = text("최근 읽은 책", 18, textColor(), true);
         LinearLayout.LayoutParams rtLp = new LinearLayout.LayoutParams(-1, -2);
-        rtLp.topMargin = dp(27);
         content.addView(recentTitle, rtLp);
-        TextView recentHint = text("읽던 위치는 자동으로 저장됩니다", 11, mutedColor(), false);
+        TextView recentHint = text("읽던 위치부터 바로 이어 읽을 수 있어요", 12, mutedColor(), false);
         content.addView(recentHint);
         addRecentBooks(content);
 
-        TextView foot = text("목차 자동 인식  ·  책갈피  ·  종이 / 세피아 / 야간 화면", 11, mutedColor(), false);
-        LinearLayout.LayoutParams footLp = new LinearLayout.LayoutParams(-1, -2);
-        footLp.topMargin = dp(25);
-        content.addView(foot, footLp);
         scroll.addView(content);
         outer.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
     }
@@ -679,9 +654,9 @@ public class MainActivity extends Activity {
         TextView toc=text("목차",11,textColor(),true);toc.setGravity(Gravity.CENTER);toc.setOnClickListener(v->showToc());
         TextView mark=text("☆",20,textColor(),false);mark.setGravity(Gravity.CENTER);mark.setOnClickListener(v->toggleBookmark());
         TextView settings=text("Aa",13,textColor(),true);settings.setGravity(Gravity.CENTER);settings.setOnClickListener(v->showSettings());
-        toolbar.addView(toc,new LinearLayout.LayoutParams(dp(43),dp(48)));
-        toolbar.addView(mark,new LinearLayout.LayoutParams(dp(38),dp(48)));
-        toolbar.addView(settings,new LinearLayout.LayoutParams(dp(42),dp(48)));
+        toolbar.addView(toc,new LinearLayout.LayoutParams(dp(48),dp(48)));
+        toolbar.addView(mark,new LinearLayout.LayoutParams(dp(48),dp(48)));
+        toolbar.addView(settings,new LinearLayout.LayoutParams(dp(48),dp(48)));
         root.addView(toolbar);
 
         progressBar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
@@ -692,7 +667,7 @@ public class MainActivity extends Activity {
         readerScroll=new ScrollView(this);readerScroll.setFillViewport(false);readerScroll.setClipToPadding(false);
         chapterContent=column();chapterContent.setPadding(horizontalInset(),dp(34),horizontalInset(),dp(44));
         chapterMeta.setText(chapters.get(chapterIndex).title+(bookAuthor().isEmpty()?"":" · "+bookAuthor()));
-        TextView kicker=text(String.format(Locale.ROOT,"CHAPTER %02d",chapterIndex+1),11,mutedColor(),true);
+        TextView kicker=text(String.format(Locale.KOREA,"%02d / %02d",chapterIndex+1,chapters.size()),11,mutedColor(),true);
         chapterContent.addView(kicker);
         chapterHeading=text(chapters.get(chapterIndex).title,27,textColor(),true);
         chapterHeading.setLineSpacing(dp(3),1f);
@@ -812,7 +787,7 @@ public class MainActivity extends Activity {
         LinearLayout panel=column();panel.setPadding(dp(20),dp(8),dp(20),dp(6));
         addSeekSetting(panel,"글자 크기",16,34,textSize,value->{textSize=value;prefs.edit().putInt("textSize",textSize).apply();applyReaderStyle();});
         addSeekSetting(panel,"줄 간격",150,250,Math.round(lineSpacing*100),value->{lineSpacing=value/100f;prefs.edit().putFloat("lineSpacing",lineSpacing).apply();applyReaderStyle();});
-        addSeekSetting(panel,"화면 밝기",60,100,brightness,value->{brightness=value;prefs.edit().putInt("brightness",brightness).apply();applyReaderStyle();});
+        addSeekSetting(panel,"화면 밝기",10,100,brightness,value->{brightness=value;prefs.edit().putInt("brightness",brightness).apply();applyReaderStyle();});
         TextView themeLabel=text("화면 분위기",13,textColor(),true);LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(-1,-2);tlp.topMargin=dp(14);panel.addView(themeLabel,tlp);
         LinearLayout themes=row();
         for(String[] item:new String[][]{{"종이","paper"},{"세피아","sepia"},{"야간","night"}}){Button b=button(item[0],theme.equals(item[1]));b.setOnClickListener(v->{theme=item[1];prefs.edit().putString("theme",theme).apply();applyReaderStyle();});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1);lp.rightMargin=dp(5);themes.addView(b,lp);}
@@ -827,14 +802,21 @@ public class MainActivity extends Activity {
 
     private interface IntChange { void changed(int value); }
     private void addSeekSetting(LinearLayout parent,String label,int min,int max,int value,IntChange change) {
-        LinearLayout holder=column();TextView caption=text(label+"  ·  "+value,13,textColor(),true);holder.addView(caption);
+        LinearLayout holder=column();TextView caption=text(label+"  ·  "+formatSettingValue(label,value),13,textColor(),true);holder.addView(caption);
         SeekBar seek=new SeekBar(this);seek.setMax(max-min);seek.setProgress(Math.max(0,Math.min(max-min,value-min)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
-            @Override public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){int v=min+progress;caption.setText(label+"  ·  "+(label.equals("줄 간격")?String.format(Locale.ROOT,"%.2f",v/100f):v));if(fromUser)change.changed(v);}
+            @Override public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){int v=min+progress;caption.setText(label+"  ·  "+formatSettingValue(label,v));if(fromUser)change.changed(v);}
             @Override public void onStartTrackingTouch(SeekBar bar){}
             @Override public void onStopTrackingTouch(SeekBar bar){}
         });
         holder.addView(seek);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(9);parent.addView(holder,lp);
+    }
+
+    private String formatSettingValue(String label,int value) {
+        if(label.equals("줄 간격"))return String.format(Locale.ROOT,"%.2f",value/100f);
+        if(label.equals("화면 밝기"))return value+"%";
+        if(label.equals("글자 크기"))return value+"sp";
+        return String.valueOf(value);
     }
 
     private void goHome() { savePosition();showLibrary(); }
