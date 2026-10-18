@@ -20,7 +20,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
-import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -95,7 +94,6 @@ public class MainActivity extends Activity {
     private int chapterIndex = 0;
     private int textSize = 21;
     private float lineSpacing = 1.9f;
-    private int brightness = 100;
     private String theme = "paper";
     private String width = "medium";
 
@@ -123,7 +121,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("reader", MODE_PRIVATE);
         textSize = prefs.getInt("textSize", 21);
         lineSpacing = prefs.getFloat("lineSpacing", 1.9f);
-        brightness = Math.max(10, Math.min(100, prefs.getInt("brightness", 100)));
+        prefs.edit().remove("brightness").apply();
         theme = prefs.getString("theme", "paper");
         width = prefs.getString("width", "medium");
         Uri incoming = getIntent() == null ? null : getIntent().getData();
@@ -218,9 +216,6 @@ public class MainActivity extends Activity {
         boolean night = "night".equals(theme);
         window.setStatusBarColor(paperColor());
         window.setNavigationBarColor(paperColor());
-        WindowManager.LayoutParams attrs = window.getAttributes();
-        attrs.screenBrightness = Math.max(0.1f, Math.min(1f, brightness / 100f));
-        window.setAttributes(attrs);
         if (Build.VERSION.SDK_INT >= 23) {
             View decor = window.getDecorView();
             int flags = decor.getSystemUiVisibility();
@@ -787,7 +782,6 @@ public class MainActivity extends Activity {
         LinearLayout panel=column();panel.setPadding(dp(20),dp(8),dp(20),dp(6));
         addSeekSetting(panel,"글자 크기",16,34,textSize,value->{textSize=value;prefs.edit().putInt("textSize",textSize).apply();applyReaderStyle();});
         addSeekSetting(panel,"줄 간격",150,250,Math.round(lineSpacing*100),value->{lineSpacing=value/100f;prefs.edit().putFloat("lineSpacing",lineSpacing).apply();applyReaderStyle();});
-        addSeekSetting(panel,"화면 밝기",10,100,brightness,value->{brightness=value;prefs.edit().putInt("brightness",brightness).apply();applyReaderStyle();});
         TextView themeLabel=text("화면 분위기",13,textColor(),true);LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(-1,-2);tlp.topMargin=dp(14);panel.addView(themeLabel,tlp);
         LinearLayout themes=row();
         for(String[] item:new String[][]{{"종이","paper"},{"세피아","sepia"},{"야간","night"}}){Button b=button(item[0],theme.equals(item[1]));b.setOnClickListener(v->{theme=item[1];prefs.edit().putString("theme",theme).apply();applyReaderStyle();});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1);lp.rightMargin=dp(5);themes.addView(b,lp);}
@@ -814,7 +808,6 @@ public class MainActivity extends Activity {
 
     private String formatSettingValue(String label,int value) {
         if(label.equals("줄 간격"))return String.format(Locale.ROOT,"%.2f",value/100f);
-        if(label.equals("화면 밝기"))return value+"%";
         if(label.equals("글자 크기"))return value+"sp";
         return String.valueOf(value);
     }
